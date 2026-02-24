@@ -20,7 +20,7 @@ from openpyxl.utils import get_column_letter
 DB_FIL      = "boligpriser.db"
 URL_REGION  = "https://data.ssb.no/api/v0/en/table/06035"
 URL_KVARTAL = "https://data.ssb.no/api/v0/en/table/07241"
-ONSKEDE     = ["Oslo", "Bergen", "Trondheim", "Stavanger", "Hele landet"]
+ONSKEDE     = ["Oslo", "Bergen", "Trondheim", "Stavanger", "Hele landet", "The whole country"]
 
 st.set_page_config(page_title="Norsk Boligprisstatistikk", page_icon="🏠", layout="wide")
 
@@ -54,7 +54,7 @@ def parse(data):
 def oppdater_db():
     meta_r = hent_meta(URL_REGION)
     reg_k = [k for k, l in zip(meta_r["Region"]["values"], meta_r["Region"]["labels"])
-             if any(o.lower() in l.lower() for o in ONSKEDE)]
+             if any(l.lower().startswith(o.lower()) or o.lower() in l.lower() for o in ONSKEDE)]
     if not reg_k:
         reg_k = meta_r["Region"]["values"][:5]
 

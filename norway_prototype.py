@@ -23,7 +23,7 @@ OUTPUT_EXCEL = "norsk_boligpris_prototype.xlsx"
 OUTPUT_DB    = "boligpriser.db"
 URL_REGION   = "https://data.ssb.no/api/v0/en/table/06035"
 URL_KVARTAL  = "https://data.ssb.no/api/v0/en/table/07241"
-ONSKEDE      = ["Oslo", "Bergen", "Trondheim", "Stavanger", "Hele landet"]
+ONSKEDE      = ["Oslo", "Bergen", "Trondheim", "Stavanger", "Hele landet", "The whole country"]
 
 BLUE_DARK  = "1F4E79"
 GREY_LIGHT = "F2F2F2"
@@ -63,7 +63,7 @@ def hent_region():
     meta = hent_meta(URL_REGION)
     reg_k, reg_l = [], []
     for k, l in zip(meta["Region"]["values"], meta["Region"]["labels"]):
-        if any(o.lower() in l.lower() for o in ONSKEDE):
+        if any(l.lower().startswith(o.lower()) or o.lower() in l.lower() for o in ONSKEDE):
             reg_k.append(k); reg_l.append(l)
     if not reg_k:
         reg_k = meta["Region"]["values"][:5]; reg_l = meta["Region"]["labels"][:5]
