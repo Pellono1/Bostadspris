@@ -98,7 +98,9 @@ def oppdater_db():
 def hent_region():
     conn = sqlite3.connect(DB_FIL)
     df = pd.read_sql("SELECT * FROM region_arsvis", conn)
-    conn.close(); return df
+    conn.close()
+    df["region"] = df["region"].str.split(" - ").str[0]
+    return df
 
 @st.cache_data
 def hent_kvartal():
