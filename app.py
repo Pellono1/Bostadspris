@@ -140,7 +140,8 @@ def oppdater_db():
     c.execute("""CREATE TABLE IF NOT EXISTS sverige_brf (
         id INTEGER PRIMARY KEY AUTOINCREMENT, region TEXT, bostadstyp TEXT,
         periode TEXT, medelpris_tkr REAL, land TEXT, kilde TEXT, hentet TEXT)""")
-    c.execute("""CREATE TABLE IF NOT EXISTS oslo_fullfort (
+    c.execute("DROP TABLE IF EXISTS oslo_fullfort")
+    c.execute("""CREATE TABLE oslo_fullfort (
         id INTEGER PRIMARY KEY AUTOINCREMENT, kvartal TEXT, byggeareal TEXT, antall REAL, hentet TEXT)""")
 
     c.execute("DELETE FROM region_arsvis")
