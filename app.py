@@ -19,7 +19,7 @@ DB_FIL          = "boligpriser.db"
 URL_NO_REG      = "https://data.ssb.no/api/v0/en/table/06035"
 URL_NO_KV       = "https://data.ssb.no/api/v0/en/table/07241"
 URL_SE          = "https://api.scb.se/OV0104/v1/doris/sv/ssd/BO/BO0501/BO0501C/FastprisBRFRegionAr"
-URL_OSLO_FF     = "https://data.ssb.no/api/v0/no/table/06265"
+URL_OSLO_FF     = "https://data.ssb.no/api/v0/no/table/05889"
 ONSKEDE_NO      = ["Oslo", "Bergen", "Trondheim", "Stavanger", "The whole country"]
 
 st.set_page_config(page_title="Nordisk Boligprisstatistikk", page_icon="🏠", layout="wide")
@@ -83,26 +83,16 @@ def hent_scb_data():
     return rows
 
 def hent_oslo_fullfort():
-    """Hent fullførte boliger i Oslo fra SSB tabell 06265."""
+    """Hent fullførte boliger i Oslo fra SSB tabell 05889."""
     meta = hent_meta_no(URL_OSLO_FF)
 
-    # Finn Oslo-kode
-    oslo_koder = [k for k, l in zip(meta["Region"]["values"], meta["Region"]["labels"])
-                  if "oslo" in l.lower()]
-    if not oslo_koder:
-        oslo_koder = [meta["Region"]["values"][0]]
-
-    # Bygningstype: store frittliggende/sammenbyggede (kode 4 = Boligblokk o.l.)
-    # Bruk alle typer og summer
-    alle_bt = meta["Bygningstype"]["values"]
-
-    # Hent alle kvartaler (hele serien fra 2000)
-    alle_tid = [t for t in meta["Tid"]["values"] if t >= "2000K1"]
+    alle_bt = meta["Byggeareal"]["values"]
+    alle_tid = meta["Tid"]["values"]
 
     query = [
-        {"code": "Region",       "selection": {"filter": "item", "values": oslo_koder}},
-        {"code": "Bygningstype", "selection": {"filter": "item", "values": alle_bt}},
-        {"code": "ContentsCode", "selection": {"filter": "item", "values": [meta["ContentsCode"]["values"][0]]}},
+        {"code": "Region",       "selection": {"filter": "item", "values": ["0301"]}},
+        {"code": "Byggeareal",   "selection": {"filter": "item", "values": alle_bt}},
+        {"code": "ContentsCode", "selection": {"filter": "item", "values": ["Fullforte"]}},
         {"code": "Tid",          "selection": {"filter": "item", "values": alle_tid}},
     ]
     data = hent_json_no(URL_OSLO_FF, query)
