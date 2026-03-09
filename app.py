@@ -28,6 +28,14 @@ st.set_page_config(page_title="Nordisk Boligprisstatistikk", page_icon="🏠", l
 def fix(t):
     return t.replace("km²","m²").replace("km2","m²").replace("KM2","m²")
 
+def rens_region(navn):
+    """Fjern samiske tillegg og årstall fra regionnavn."""
+    import re
+    navn = re.sub(r'\s*-\s*[A-ZÆØÅ][a-zæøå]+$', '', navn)   # "Oslo - Oslove" → "Oslo"
+    navn = re.sub(r'\s+\d{4}-.*$', '', navn)                   # "Bergen 1972-..." → "Bergen"
+    navn = re.sub(r'\s*\(.*?\)', '', navn)                      # fjern parenteser
+    return navn.strip()
+
 def hent_meta_no(url):
     r = requests.get(url, timeout=30); r.raise_for_status()
     return {v["code"]: {"values": v["values"], "labels": v["valueTexts"]}
@@ -256,6 +264,8 @@ with tab1:
         valgt_p = st.selectbox("År", ["Alle"] + list(reversed(perioder)))
     filtrert = df_no_reg[df_no_reg["region"].isin(valgte_reg) & df_no_reg["boligtype"].isin(valgte_bt)]
     if valgt_p != "Alle": filtrert = filtrert[filtrert["periode"] == valgt_p]
+    filtrert = filtrert.copy()
+    filtrert["region"] = filtrert["region"].apply(rens_region)
     filtrert = filtrert[["region","boligtype","periode","pris_m2"]].sort_values(["periode","region"], ascending=[False,True]).rename(
         columns={"region":"Region","boligtype":"Boligtype","periode":"År","pris_m2":"Pris per m² (NOK)"})
     st.markdown(f"**{len(filtrert)} rader**")
@@ -310,16 +320,27 @@ with tab3:
 # ── TAB 4: OSLO FÆRDIGSTILTE BOLIGER ─────────────────────────────────────────
 with tab4:
     st.subheader("Fullførte boliger i Oslo")
-    st.caption("Kilde: SSB tabell 06265 · Alle bygningstyper summert · kv 1 2000 – siste kvartal")
+    st.caption("Kilde: SSB tabell 05889 · kv 1 2000 – siste kvartal")
 
     if df_oslo.empty:
         st.info("Ingen data. Klikk 'Hent ny data' øverst.")
     else:
         bt_options = {
-            "Store boligbygg (≥2 etasjer) – som i presentasjonen": ["141","142","143","144","145","146"],
+            "Store boligbygg (≥2 etasjer) – som i presentasjonen": [
+                "Store frittliggende boligbygg på 2 etasjer",
+                "Store frittliggende boligbygg på 3 og 4 etasjer",
+                "Store frittliggende boligbygg på 5 etasjer eller over",
+                "Stort sammenbygd boligbygg på 2 etasjer",
+                "Stort sammenbygd boligbygg på 3 og 4 etasjer",
+                "Stort sammenbygd boligbygg på 5 etasjer eller over",
+            ],
             "Alle bygningstyper": None,
-            "Eneboliger": ["111","112","113"],
-            "Småhus": ["121","122","123","124","131","133","135","136"],
+            "Eneboliger": ["Enebolig", "Enebolig med hybelleilighet, sokkelleilighet o.l.", "Våningshus"],
+            "Småhus": [
+                "Del av tomannsbolig, vertikaldelt", "Tomannsbolig, horisontaldelt",
+                "Rekkehus", "Kjedehus inkl.atriumhus", "Terrassehus",
+                "Andre småhus med 3 boliger eller flere"
+            ],
         }
         valgt_filter = st.selectbox("Bygningstype", list(bt_options.keys()))
         koder = bt_options[valgt_filter]
