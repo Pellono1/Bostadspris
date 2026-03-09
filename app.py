@@ -98,15 +98,13 @@ def hent_oslo_fullfort():
     data = hent_json_no(URL_OSLO_FF, query)
     rows = parse_no(data)
 
-    # Summer over bygningstyper per kvartal
     df = pd.DataFrame(rows)
     if df.empty:
         return df
     df["verdi"] = pd.to_numeric(df["verdi"], errors="coerce").fillna(0)
-    df_agg = df.groupby("Tid")["verdi"].sum().reset_index()
-    df_agg.columns = ["kvartal", "antall"]
-    df_agg = df_agg.sort_values("kvartal").reset_index(drop=True)
-    return df_agg
+    df = df.rename(columns={"Tid": "kvartal", "Byggeareal": "byggeareal", "verdi": "antall"})
+    df = df[["kvartal", "byggeareal", "antall"]].sort_values("kvartal").reset_index(drop=True)
+    return df
 
 # ── OPPDATER DATABASE ─────────────────────────────────────────────────────────
 def oppdater_db():
@@ -143,7 +141,7 @@ def oppdater_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT, region TEXT, bostadstyp TEXT,
         periode TEXT, medelpris_tkr REAL, land TEXT, kilde TEXT, hentet TEXT)""")
     c.execute("""CREATE TABLE IF NOT EXISTS oslo_fullfort (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, kvartal TEXT, antall REAL, hentet TEXT)""")
+        id INTEGER PRIMARY KEY AUTOINCREMENT, kvartal TEXT, byggeareal TEXT, antall REAL, hentet TEXT)""")
 
     c.execute("DELETE FROM region_arsvis")
     c.execute("DELETE FROM nasjonalt_kvartal")
@@ -162,8 +160,8 @@ def oppdater_db():
                   (row["region"], row["bostadstyp"], row["periode"], row["medelpris_tkr"], row["land"], row["kilde"], hentet))
     if not oslo_df.empty:
         for _, row in oslo_df.iterrows():
-            c.execute("INSERT INTO oslo_fullfort (kvartal, antall, hentet) VALUES (?,?,?)",
-                      (row["kvartal"], row["antall"], hentet))
+            c.execute("INSERT INTO oslo_fullfort (kvartal, byggeareal, antall, hentet) VALUES (?,?,?,?)",
+                      (row["kvartal"], row["byggeareal"], row["antall"], hentet))
 
     conn.commit(); conn.close()
     return len(no_reg), len(no_kv), len(se_rows), len(oslo_df)
@@ -316,16 +314,31 @@ with tab4:
     if df_oslo.empty:
         st.info("Ingen data. Klikk 'Hent ny data' øverst.")
     else:
-        df_oslo = df_oslo.sort_values("kvartal").reset_index(drop=True)
-        df_oslo["ma4"] = df_oslo["antall"].rolling(window=4).mean()
-        snitt = df_oslo["antall"].mean()
+        bt_options = {
+            "Store boligbygg (≥2 etasjer) – som i presentasjonen": ["141","142","143","144","145","146"],
+            "Alle bygningstyper": None,
+            "Eneboliger": ["111","112","113"],
+            "Småhus": ["121","122","123","124","131","133","135","136"],
+        }
+        valgt_filter = st.selectbox("Bygningstype", list(bt_options.keys()))
+        koder = bt_options[valgt_filter]
+
+        if koder and "byggeareal" in df_oslo.columns:
+            df_vis = df_oslo[df_oslo["byggeareal"].isin(koder)]
+        else:
+            df_vis = df_oslo
+
+        df_agg = df_vis.groupby("kvartal")["antall"].sum().reset_index()
+        df_agg = df_agg.sort_values("kvartal").reset_index(drop=True)
+        df_agg["ma4"] = df_agg["antall"].rolling(window=4).mean()
+        snitt = df_agg["antall"].mean()
 
         fig = go.Figure()
 
         # Stapeldiagram per kvartal
         fig.add_trace(go.Bar(
-            x=df_oslo["kvartal"],
-            y=df_oslo["antall"],
+            x=df_agg["kvartal"],
+            y=df_agg["antall"],
             name="Per kvartal",
             marker_color="#E8541A",
             opacity=0.85
@@ -333,8 +346,8 @@ with tab4:
 
         # 4-kvartalers glidende gjennomsnitt
         fig.add_trace(go.Scatter(
-            x=df_oslo["kvartal"],
-            y=df_oslo["ma4"],
+            x=df_agg["kvartal"],
+            y=df_agg["ma4"],
             name="4-kv. glidende medelvärde",
             line=dict(color="#1A1A1A", width=2)
         ))
@@ -362,11 +375,11 @@ with tab4:
         st.plotly_chart(fig, use_container_width=True)
 
         # Tabell + nedlasting
-        vis_df = df_oslo[["kvartal","antall"]].rename(columns={"kvartal":"Kvartal","antall":"Antal fullförda"})
+        vis_df = df_agg[["kvartal","antall"]].rename(columns={"kvartal":"Kvartal","antall":"Antal fullförda"})
         st.download_button("⬇️ Last ned Excel", data=lag_excel(vis_df, "Oslo fullfort"),
                            file_name="oslo_fullfort.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                            key="dl_oslo")
 
 st.divider()
-st.caption("Prototype · Norge: SSB 06035 + 07241 + 06265 · Sverige: SCB FastprisBRFRegionAr · Klikk 'Hent ny data' for å oppdatere")
+st.caption("Prototype · Norge: SSB 06035 + 07241 + 05889 · Sverige: SCB FastprisBRFRegionAr · Klikk 'Hent ny data' for å oppdatere")
